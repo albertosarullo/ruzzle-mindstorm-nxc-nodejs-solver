@@ -1,9 +1,9 @@
-ruzzle-mindstorm-nxc-nodejs-solver
+Ruzzle-Lego-Mindstorm-Nxc-NodeJS-Solver
 ==================================
 
 Ruzzle solver, software & hardware :D
 
-On sowftare side we have:
+On software side we have:
 - bash script for download screenshot of device
 - imagemagick to process screenshot image
 - tesseract (opensource OCR) for character recognition
