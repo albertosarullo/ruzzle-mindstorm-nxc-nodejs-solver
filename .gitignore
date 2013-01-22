@@ -18,3 +18,4 @@ _UTIL
 # nodejs mudules folder
 /node_modules
 /dictionary
+/temp
