@@ -1,0 +1,261 @@
+
+
+
+
+#define BT_CONN 0
+#define INBOX 2
+#define OUTBOX 9
+sub BTCheck(int conn){
+    if (!BluetoothStatus(conn) == NO_ERR){
+        TextOut(5, LCD_LINE3, "     ERROR ");
+        TextOut(5, LCD_LINE5, "  NO BLUETOOTH");
+        PlaySound(SOUND_DOWN);
+        Stop(true);
+    } else {
+        TextOut(5, LCD_LINE5, "Bluetooth OK :)");
+        PlaySound(SOUND_UP);
+    }
+}
+
+sub readBluetoothMsg() {
+    string in, out, iStr;
+    string buffer;
+    int i = 0;
+    BTCheck(BT_CONN); //check master connection
+    
+    SetSensorLowspeed(IN_4);
+
+    while (true) {
+        ClearScreen();
+        TextOut(0, LCD_LINE1, "Bluetooth: slave");
+        
+        char result = ReceiveMessage(INBOX, true, buffer);
+        
+        if (result == 0) {
+            TextOut(0, LCD_LINE3, "Mailbox 2:");
+            TextOut(0, LCD_LINE5, buffer);
+            // TextOut(10, LCD_LINE3, NumToStr(success));
+            // NumOut(50, LCD_LINE5,number);
+            // SendResponseString(OUTBssOX, "werwerewrewre");
+            
+            // SendMessage(OUTBOX, distanceStr);
+
+        } else {
+            TextOut(10, LCD_LINE5, "empty mailbox");
+
+        }
+        // Wait(100);
+        i++;
+    }
+}
+
+
+int btMessageIndex = 0;
+int moves[];
+int completeLength = 0;
+
+sub receiveBTMessage() {
+    BTCheck(BT_CONN); //check master connection
+    
+    
+    string buffer;
+    
+    while(true) {
+        ClearScreen();
+        TextOut(0, LCD_LINE1, "Bluetooth: SLAVE");
+        
+        char result = ReceiveMessage(INBOX, true, buffer);
+        if (result == 0) {
+            TextOut(0, LCD_LINE3, "Mailbox 2:");
+            TextOut(0, LCD_LINE5, buffer);
+            completeLength = StrToNum(buffer);
+            ArrayInit(moves, 0, completeLength);
+            NumOut(0, LCD_LINE1, completeLength);
+            
+            PlaySound(SOUND_FAST_UP);
+            Wait(MS_500);
+            
+            break;
+        } else {
+            TextOut(10, LCD_LINE4, "Empty mailbox");
+        }
+        Wait(100);
+    }
+    
+    int continueReadMessage = 1;
+    int letter = 0;
+    while (1) {
+        
+        char result = ReceiveMessage(INBOX, true, buffer);
+        if (result == 0) {
+            ClearScreen();
+            
+            TextOut(0, LCD_LINE3, "Mailbox 2:");
+            TextOut(0, LCD_LINE4, buffer);
+            if (buffer == "8") {
+                TextOut(0, LCD_LINE6, "END");
+                continueReadMessage = 0;
+                break;
+            } else {
+                int msgLength = StrLen(buffer);
+                for (int i = 0; i < msgLength; i++) {
+                    letter = StrToNum( SubStr(buffer, i, 1) );
+                    moves[btMessageIndex] = letter;
+                    btMessageIndex++;
+                }
+                NumOut(0, LCD_LINE5, btMessageIndex);
+            }
+        }
+        Wait(50);
+        
+    }
+    
+}
+
+
+
+int degreePerStep = 200;
+// 200
+// 130
+int oldX = -10;
+int oldY = -10;
+int adjustX = 370; // -370
+int adjustY = -150; // -290
+
+long startTime;
+int continueExecutionFlag = 1;
+
+
+sub rotateMotorToDegree(int motor, int degree) {
+    PosRegSetAngle(motor, degree);
+    while (MotorTachoCount(motor) != degree) {
+        Wait(1);
+    }
+}
+
+sub rotateMotorsToDegrees(int motorA, int degreeA, int motorB, int degreeB) {
+    PosRegSetAngle(motorA, degreeA);
+    PosRegSetAngle(motorB, degreeB);
+    while (MotorTachoCount(motorA) != degreeA && MotorTachoCount(motorB) != degreeB) {
+        Wait(1);
+    }
+}
+
+sub go(int sX, int sY) {
+    if (sX == oldX && sY != oldY) {
+        rotateMotorToDegree(OUT_A, -sY * degreePerStep + adjustY);
+    } else if (sY == oldY && sX != oldX) {
+        rotateMotorToDegree(OUT_C, -sX * degreePerStep + adjustX);
+    } else {
+        rotateMotorsToDegrees(OUT_C, -sX * degreePerStep + adjustX, OUT_A, -sY * degreePerStep + adjustY);
+    }
+    oldX = sX;
+    oldY = sY;
+}
+
+
+task exitOnTimeEndTask()
+{
+    startTime = CurrentTick();
+    while (1) {
+        if (ButtonPressed(BTNCENTER, true) ) {
+            continueExecutionFlag = 0;
+        }
+        long deltaTime = CurrentTick() - startTime;
+        if (deltaTime > 112 * 1000) {
+            continueExecutionFlag = 0;
+        }
+        Wait(1000);
+    }
+    
+}
+
+
+sub fakePlan() {
+    string complete;
+    complete = "613237601007601117601127601027613227601107600117600107611017611007611127611207";
+    //611217861110786121178631327863120786313078631217860201786201178620317862030786202178620107";
+    
+    complete = "600303303007";
+    // complete = "60030";
+    complete = "6332211007601117613120176110176021201761322233376010276000176333223761001762333227623333276233322760110763323763233227623337632337";
+    
+    completeLength = StrLen(complete);
+    ArrayInit(moves, 0, completeLength);
+    for (int i = 0; i < completeLength; i++) {
+        moves[i] = StrToNum( SubStr(complete, i, 1));
+    }
+}
+
+task main() {
+
+    SetMotorRegulationTime(MS_10);
+    SetMotorRegulationOptions(OUT_REGOPTION_NO_SATURATION);
+    PosRegSetMax(OUT_A, 100, 100);
+    PosRegSetMax(OUT_B, 100, 100);
+    PosRegSetMax(OUT_C, 100, 100);
+    
+    PosRegEnable(OUT_A);
+    PosRegEnable(OUT_B);
+    PosRegEnable(OUT_C);
+
+
+    while(true) {
+        // fakePlan();
+        receiveBTMessage();
+
+        StartTask(exitOnTimeEndTask);
+    
+        bool down = false;
+        int wordIndex = 0;
+        for (int i = 0; i < completeLength; i++) {
+            if (continueExecutionFlag == 0) {
+                break;
+            }
+            ClearScreen();
+            int letter = moves[i];
+                
+            if (letter == 6) {
+                
+            } else if (letter == 7) {
+                wordIndex++;
+                rotateMotorToDegree(OUT_B, 0);
+                down = false;
+            } else {
+                int x = letter;
+                int y = moves[i + 1];
+                NumOut(0, LCD_LINE1, i);
+                NumOut(50, LCD_LINE7, wordIndex);
+                    
+                NumOut(0, LCD_LINE3, x);
+                NumOut(20, LCD_LINE3, y);
+                NumOut(0, LCD_LINE5, oldX);
+                NumOut(20, LCD_LINE5, oldY);
+                go(x, y);
+                if (!down) {
+                    rotateMotorToDegree(OUT_B, 39);
+                    down = true;
+                }
+                i++;
+            }
+        }
+
+        rotateMotorToDegree(OUT_B, 0);
+        rotateMotorToDegree(OUT_A, 0);
+        rotateMotorToDegree(OUT_C, 0);
+
+        PlaySound(SOUND_UP);
+        PlaySound(SOUND_UP);
+        PlaySound(SOUND_UP);
+        
+        StopTask(exitOnTimeEndTask);
+
+    }
+
+    Stop(true);
+}
+
+
+
+
+
